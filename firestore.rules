@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Galaxy Computers CRM Rules
+    // Allows full access for CRM operations (customers, followUps, callLogs, auditLogs, users, counters)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

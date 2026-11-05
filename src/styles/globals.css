@@ -1,0 +1,54 @@
+@import './design-tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-foreground font-body;
+    background-color: #E0E5EC;
+    color: #3D4852;
+    min-height: 100vh;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight text-foreground font-bold;
+  }
+
+  /* Soft UI Molded Scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #E0E5EC;
+    box-shadow: inset 2px 2px 5px rgb(163, 177, 198, 0.6), inset -2px -2px 5px rgba(255, 255, 255, 0.5);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #C4CBD6;
+    border-radius: 9999px;
+    box-shadow: 2px 2px 5px rgb(163, 177, 198, 0.6), -2px -2px 5px rgba(255, 255, 255, 0.5);
+    border: 2px solid #E0E5EC;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #059669;
+  }
+}
+
+/* Animations and accessibility */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

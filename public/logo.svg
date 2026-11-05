@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="renuviaGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="renuviaGrad2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#0D9488" />
+    </linearGradient>
+    <linearGradient id="renuviaGrad3" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Eco-Loop Arrow 1 (Top to Bottom-Right) -->
+  <path d="M 45,14 C 62,14 78,24 84,39 L 89,35 L 86,52 L 70,47 L 75,43 C 70,32 58,24 45,24 C 36,24 28,28 22,34 L 15,27 C 23,19 33,14 45,14 Z" fill="url(#renuviaGrad1)" />
+
+  <!-- Outer Eco-Loop Arrow 2 (Bottom-Right to Bottom-Left) -->
+  <path d="M 85,55 C 86,63 83,72 77,79 C 67,90 53,94 40,91 L 41,98 L 26,89 L 36,76 L 37,82 C 46,84 57,81 64,73 C 69,67 72,61 72,55 Z" fill="url(#renuviaGrad2)" />
+
+  <!-- Outer Eco-Loop Arrow 3 (Bottom-Left to Top) -->
+  <path d="M 23,73 C 16,64 14,52 17,40 L 10,41 L 21,27 L 31,39 L 25,39 C 23,47 25,56 30,63 C 34,68 39,72 45,74 L 42,83 C 34,81 28,77 23,73 Z" fill="url(#renuviaGrad3)" />
+
+  <!-- Central Microchip / Circuit Tech Diamond -->
+  <rect x="42" y="42" width="16" height="16" rx="4" fill="#065F46" />
+  <circle cx="50" cy="50" r="3.5" fill="#34D399" />
+
+  <!-- Circuit Trace Connectors -->
+  <path d="M 50,38 L 50,42 M 50,58 L 50,62 M 38,50 L 42,50 M 58,50 L 62,50" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" />
+  <circle cx="50" cy="36" r="1.5" fill="#10B981" />
+  <circle cx="50" cy="64" r="1.5" fill="#10B981" />
+  <circle cx="36" cy="50" r="1.5" fill="#10B981" />
+  <circle cx="64" cy="50" r="1.5" fill="#10B981" />
+</svg>
