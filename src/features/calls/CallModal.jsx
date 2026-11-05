@@ -247,7 +247,7 @@ export function CallModal({
           <div className="space-y-4 p-4 bg-background shadow-neu-pressed-sm rounded-2xl">
             <Input
               label="Next Action to Take"
-              placeholder="e.g. Share quotation on WhatsApp, Check RAM stock, Arrange demo"
+              placeholder="e.g. Share ITAD disposal quote, Dispatch site inspection team, Request Form-6 docs"
               value={nextAction}
               onChange={(e) => setNextAction(e.target.value)}
             />

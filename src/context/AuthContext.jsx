@@ -5,6 +5,7 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, getDocs, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
@@ -12,31 +13,27 @@ import { logAudit } from '../services/auditService';
 
 const AuthContext = createContext(null);
 
-function getSavedDemoAuth() {
+// Clean out legacy demo auth from browser storage
+if (typeof window !== 'undefined') {
   try {
-    const saved = localStorage.getItem('renuvia_demo_auth');
-    if (saved) {
-      return JSON.parse(saved);
-    }
+    localStorage.removeItem('renuvia_demo_auth');
+    localStorage.removeItem('galaxy_demo_auth');
   } catch (e) {
-    // Ignore parse error
+    // Ignore error
   }
-  return null;
 }
 
 export function AuthProvider({ children }) {
-  const savedDemo = getSavedDemoAuth();
-  const [user, setUser] = useState(savedDemo?.demoUser || null);
-  const [userProfile, setUserProfile] = useState(savedDemo?.demoProfile || null);
-  // If demo session exists, we are already loaded immediately!
-  const [loading, setLoading] = useState(!savedDemo);
+  const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
-    // Strict safety timeout: never stay in loading state for more than 500ms
+    // Safety timer to prevent perpetual loading on network issues
     const safetyTimer = setTimeout(() => {
       setLoading(false);
-    }, 500);
+    }, 1500);
 
     let unsubscribe = () => {};
 
@@ -57,7 +54,10 @@ export function AuthProvider({ children }) {
               } else {
                 const allUsersSnap = await getDocs(collection(db, 'users'));
                 const isFirstUser = allUsersSnap.empty;
-                const isKnownAdmin = firebaseUser.email === '63387siddhartha@gmail.com' || firebaseUser.email === 'siddhartha@gmail.com';
+                const isKnownAdmin =
+                  firebaseUser.email === '6387siddhartha@gmail.com' ||
+                  firebaseUser.email === '63387siddhartha@gmail.com' ||
+                  firebaseUser.email === 'siddhartha@gmail.com';
 
                 const newProfile = {
                   uid: firebaseUser.uid,
@@ -73,24 +73,23 @@ export function AuthProvider({ children }) {
                 setUserProfile(newProfile);
               }
             } catch (dbErr) {
+              console.warn('Could not read/write user profile doc:', dbErr);
+              const isKnownAdmin =
+                firebaseUser.email === '6387siddhartha@gmail.com' ||
+                firebaseUser.email === '63387siddhartha@gmail.com' ||
+                firebaseUser.email === 'siddhartha@gmail.com';
+
               setUserProfile({
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
                 displayName: firebaseUser.displayName || 'Executive',
-                role: 'employee',
-                status: 'pending_approval',
+                role: isKnownAdmin ? 'admin' : 'employee',
+                status: isKnownAdmin ? 'active' : 'pending_approval',
               });
             }
           } else {
-            // Check if demo auth is active
-            const activeDemo = getSavedDemoAuth();
-            if (activeDemo) {
-              setUser(activeDemo.demoUser);
-              setUserProfile(activeDemo.demoProfile);
-            } else {
-              setUser(null);
-              setUserProfile(null);
-            }
+            setUser(null);
+            setUserProfile(null);
           }
         } catch (err) {
           console.error('Error in auth state change:', err);
@@ -114,7 +113,6 @@ export function AuthProvider({ children }) {
     setAuthError(null);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      localStorage.removeItem('renuvia_demo_auth');
       await logAudit({
         action: 'USER_LOGIN',
         targetType: 'auth',
@@ -138,12 +136,13 @@ export function AuthProvider({ children }) {
         await updateProfile(cred.user, { displayName });
       }
 
-      localStorage.removeItem('renuvia_demo_auth');
-
       let finalRole = 'employee';
       let finalStatus = 'pending_approval';
 
-      const isKnownAdmin = email === '63387siddhartha@gmail.com' || email === 'siddhartha@gmail.com';
+      const isKnownAdmin =
+        email === '6387siddhartha@gmail.com' ||
+        email === '63387siddhartha@gmail.com' ||
+        email === 'siddhartha@gmail.com';
 
       try {
         const allUsersSnap = await getDocs(collection(db, 'users'));
@@ -192,6 +191,17 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Password Reset
+  const resetPassword = async (email) => {
+    setAuthError(null);
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (err) {
+      setAuthError(err.message);
+      throw err;
+    }
+  };
+
   // Refresh profile from Firestore
   const refreshProfile = async () => {
     if (!user) return null;
@@ -208,30 +218,9 @@ export function AuthProvider({ children }) {
     return userProfile;
   };
 
-  // Instant Demo Mode (Internal development fallback only)
-  const loginAsDemo = (demoRole = 'admin', name = 'Siddhartha', customEmail = 'admin@renuvia.in') => {
-    const demoUser = {
-      uid: 'demo-' + demoRole + '-101',
-      email: customEmail,
-      displayName: name,
-    };
-    const demoProfile = {
-      uid: demoUser.uid,
-      email: customEmail,
-      displayName: name,
-      role: demoRole,
-      status: 'active',
-    };
-    localStorage.setItem('renuvia_demo_auth', JSON.stringify({ demoUser, demoProfile }));
-    setUser(demoUser);
-    setUserProfile(demoProfile);
-    setLoading(false);
-  };
-
   // Logout
   const logout = async () => {
     try {
-      localStorage.removeItem('renuvia_demo_auth');
       await logAudit({
         action: 'USER_LOGOUT',
         targetType: 'auth',
@@ -249,7 +238,12 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const isAdmin = userProfile?.role === 'admin' || (!userProfile?.role && (user?.email === '63387siddhartha@gmail.com' || user?.email === 'siddhartha@gmail.com'));
+  const isAdmin =
+    userProfile?.role === 'admin' ||
+    (!userProfile?.role &&
+      (user?.email === '6387siddhartha@gmail.com' ||
+        user?.email === '63387siddhartha@gmail.com' ||
+        user?.email === 'siddhartha@gmail.com'));
   const isEmployee = userProfile?.role === 'employee' || isAdmin;
   const isApproved = userProfile?.status === 'active';
 
@@ -265,8 +259,8 @@ export function AuthProvider({ children }) {
         isApproved,
         login,
         signup,
+        resetPassword,
         refreshProfile,
-        loginAsDemo,
         logout,
       }}
     >

@@ -14,32 +14,8 @@ async function capture() {
   console.log('Opening page...');
   const page = await browser.newPage();
   
-  await page.goto('http://localhost:3000/', { waitUntil: 'domcontentloaded' });
-  await new Promise(r => setTimeout(r, 1000));
-
-  console.log('Injecting auth into localStorage...');
-  await page.evaluate(() => {
-    localStorage.setItem('renuvia_demo_auth', JSON.stringify({
-      demoUser: {
-        uid: 'demo-admin-101',
-        email: 'admin@renuvia.in',
-        displayName: 'Siddhartha (Operations Admin)'
-      },
-      demoProfile: {
-        uid: 'demo-admin-101',
-        email: 'admin@renuvia.in',
-        displayName: 'Siddhartha (Operations Admin)',
-        role: 'admin',
-        status: 'active'
-      }
-    }));
-  });
-
-  console.log('Navigating to dashboard...');
-  await page.goto('http://localhost:3000/', { waitUntil: 'domcontentloaded' });
-
-  // Wait 3 seconds for data and charts
-  await new Promise(r => setTimeout(r, 3500));
+  await page.goto('http://localhost:3000/login', { waitUntil: 'domcontentloaded' });
+  await new Promise(r => setTimeout(r, 1500));
 
   const outDir = path.join(__dirname, '../docs/screenshots');
   if (!fs.existsSync(outDir)) {
@@ -48,12 +24,9 @@ async function capture() {
 
   const outPath = path.join(outDir, 'dashboard.png');
   await page.screenshot({ path: outPath, fullPage: false });
-  console.log('✅ Screenshot successfully saved to:', outPath);
+  console.log('Saved screenshot to:', outPath);
 
   await browser.close();
 }
 
-capture().catch(err => {
-  console.error('Capture failed:', err);
-  process.exit(1);
-});
+capture().catch(console.error);

@@ -18,13 +18,19 @@ import { logAudit } from './auditService';
 
 const CUSTOMERS_COLLECTION = 'customers';
 
-// Clean out any legacy demo cache from browser storage
+// Clean out legacy demo storage
 if (typeof window !== 'undefined') {
-  localStorage.removeItem('renuvia_crm_customers');
-  localStorage.removeItem('renuvia_crm_call_logs');
-  localStorage.removeItem('renuvia_crm_follow_ups');
-  localStorage.removeItem('renuvia_crm_audit_logs');
-  localStorage.removeItem('renuvia_crm_is_standby');
+  try {
+    localStorage.removeItem('renuvia_demo_auth');
+    localStorage.removeItem('galaxy_demo_auth');
+    localStorage.removeItem('renuvia_crm_customers');
+    localStorage.removeItem('renuvia_crm_call_logs');
+    localStorage.removeItem('renuvia_crm_follow_ups');
+    localStorage.removeItem('renuvia_crm_audit_logs');
+    localStorage.removeItem('renuvia_crm_is_standby');
+  } catch (e) {
+    // Ignore error
+  }
 }
 
 /**
