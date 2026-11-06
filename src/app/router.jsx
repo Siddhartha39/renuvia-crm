@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth, isKnownAdminEmail } from '../context/AuthContext';
+import { useAuth, isMasterAdminEmail } from '../context/AuthContext';
 import { AppLayout } from '../components/layout/AppLayout';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AllLeadsPage } from '../features/customers/AllLeadsPage';
@@ -15,11 +15,11 @@ import { SettingsPage } from '../features/settings/SettingsPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 
-import { ShieldAlert, ShieldCheck, RefreshCw, LogOut, Lock } from 'lucide-react';
+import { ShieldAlert, RefreshCw, LogOut, Lock } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 
 function ProtectedRoute({ children }) {
-  const { user, userProfile, loading, refreshProfile, activateSelfAsAdmin, logout } = useAuth();
+  const { user, userProfile, loading, refreshProfile, logout } = useAuth();
   const [checking, setChecking] = React.useState(false);
 
   // If loading and no user yet, display brief skeleton
@@ -41,25 +41,14 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  const isKnownAdmin = isKnownAdminEmail(user?.email);
+  const isMaster = isMasterAdminEmail(user?.email);
 
-  // Security Check 1: Account Pending Approval (only for unapproved non-admins)
-  if (userProfile && userProfile.status === 'pending_approval' && !isKnownAdmin) {
+  // Security Check 1: Account Pending Approval (strictly for unapproved accounts)
+  if (userProfile && userProfile.status === 'pending_approval' && !isMaster) {
     const handleCheckApproval = async () => {
       setChecking(true);
       await refreshProfile();
       setChecking(false);
-    };
-
-    const handleSelfActivate = async () => {
-      setChecking(true);
-      try {
-        await activateSelfAsAdmin();
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setChecking(false);
-      }
     };
 
     return (
@@ -74,7 +63,7 @@ function ProtectedRoute({ children }) {
               Account Pending Approval
             </h2>
             <p className="text-sm font-body text-[#6B7280] leading-relaxed">
-              Your account has been registered, but for security, a <strong>Renuvia Recycling Administrator</strong> must approve your access before you can view client and e-waste disposal records.
+              Your account has been registered, but for security, an authorized <strong>Renuvia Administrator</strong> must approve your access before you can view any client and e-waste disposal records.
             </p>
           </div>
 
@@ -91,39 +80,28 @@ function ProtectedRoute({ children }) {
             </div>
             <div className="flex justify-between">
               <span className="text-[#6B7280]">Designation:</span>
-              <span className="text-[#3D4852] font-medium">Sales Executive (Awaiting Activation)</span>
+              <span className="text-[#3D4852] font-medium">Recycling Operations Staff (Awaiting Activation)</span>
             </div>
           </div>
 
-          <div className="flex flex-col gap-2.5 pt-2">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <Button
               variant="primary"
-              icon={ShieldCheck}
-              onClick={handleSelfActivate}
+              icon={RefreshCw}
+              onClick={handleCheckApproval}
               disabled={checking}
-              className="w-full justify-center"
+              className="flex-1 justify-center"
             >
-              {checking ? 'Activating...' : 'Activate as Administrator (Primary Owner)'}
+              {checking ? 'Checking Status...' : 'Check Approval Status'}
             </Button>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                icon={RefreshCw}
-                onClick={handleCheckApproval}
-                disabled={checking}
-                className="flex-1 justify-center"
-              >
-                {checking ? 'Checking...' : 'Check Status'}
-              </Button>
-              <Button
-                variant="muted"
-                icon={LogOut}
-                onClick={logout}
-                className="justify-center"
-              >
-                Sign Out
-              </Button>
-            </div>
+            <Button
+              variant="secondary"
+              icon={LogOut}
+              onClick={logout}
+              className="justify-center"
+            >
+              Sign Out
+            </Button>
           </div>
         </div>
       </div>

@@ -7,29 +7,28 @@ import {
   updateProfile,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, getDocs, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { logAudit } from '../services/auditService';
 
 const AuthContext = createContext(null);
 
-export function isKnownAdminEmail(email) {
+/**
+ * Strict Master Admin Whitelist.
+ * Only exact matching emails get immediate active administrator access.
+ * All other registrations are quarantined in 'pending_approval' until an admin manually approves them.
+ */
+export const MASTER_ADMIN_EMAILS = [
+  'info@renuviarecycling.com',
+  '6387siddhartha@gmail.com',
+];
+
+export function isMasterAdminEmail(email) {
   if (!email) return false;
-  const e = email.toLowerCase().trim();
-  return (
-    e === 'info@renuviarecycling.com' ||
-    e.endsWith('@renuviarecycling.com') ||
-    e.endsWith('@renuvia.in') ||
-    e === '6387siddhartha@gmail.com' ||
-    e === '63387siddhartha@gmail.com' ||
-    e === 'siddhartha@gmail.com' ||
-    e.startsWith('admin@') ||
-    e.startsWith('info@') ||
-    e.startsWith('compliance@')
-  );
+  return MASTER_ADMIN_EMAILS.includes(email.toLowerCase().trim());
 }
 
-// Clean out legacy demo auth from browser storage
+// Clean out legacy demo storage
 if (typeof window !== 'undefined') {
   try {
     localStorage.removeItem('renuvia_demo_auth');
@@ -59,7 +58,7 @@ export function AuthProvider({ children }) {
           if (firebaseUser) {
             setUser(firebaseUser);
 
-            const isKnownAdmin = isKnownAdminEmail(firebaseUser.email);
+            const isMaster = isMasterAdminEmail(firebaseUser.email);
 
             // Fetch profile document from Firestore
             try {
@@ -68,48 +67,41 @@ export function AuthProvider({ children }) {
 
               if (snap.exists()) {
                 const existingData = snap.data();
-                if (isKnownAdmin && (existingData.status !== 'active' || existingData.role !== 'admin')) {
+                // Ensure master admins are always active admin
+                if (isMaster && (existingData.status !== 'active' || existingData.role !== 'admin')) {
                   const upgraded = { ...existingData, role: 'admin', status: 'active' };
                   setUserProfile(upgraded);
                   try {
                     await setDoc(userDocRef, { role: 'admin', status: 'active', updatedAt: serverTimestamp() }, { merge: true });
                   } catch (uErr) {
-                    console.warn('Could not upgrade admin doc in Firestore:', uErr);
+                    console.warn('Could not update admin doc in Firestore:', uErr);
                   }
                 } else {
                   setUserProfile(existingData);
                 }
               } else {
-                let isFirstUser = false;
-                try {
-                  const allUsersSnap = await getDocs(collection(db, 'users'));
-                  isFirstUser = allUsersSnap.empty;
-                } catch (e) {
-                  isFirstUser = true;
-                }
-
-                const shouldBeAdmin = isFirstUser || isKnownAdmin;
-                const newProfile = {
+                // New user: ONLY master admins get active admin status. All others get pending approval.
+                const profileData = {
                   uid: firebaseUser.uid,
                   email: firebaseUser.email,
-                  displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Administrator',
-                  role: shouldBeAdmin ? 'admin' : 'employee',
-                  status: shouldBeAdmin ? 'active' : 'active', // Allow immediate access for smooth onboarding
+                  displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Executive',
+                  role: isMaster ? 'admin' : 'employee',
+                  status: isMaster ? 'active' : 'pending_approval',
                   createdAt: serverTimestamp(),
                   lastLoginAt: serverTimestamp(),
                 };
 
-                await setDoc(userDocRef, newProfile, { merge: true });
-                setUserProfile(newProfile);
+                await setDoc(userDocRef, profileData, { merge: true });
+                setUserProfile(profileData);
               }
             } catch (dbErr) {
               console.warn('Could not read/write user profile doc:', dbErr);
               setUserProfile({
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
-                displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Administrator',
-                role: isKnownAdmin ? 'admin' : 'employee',
-                status: 'active',
+                displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Executive',
+                role: isMaster ? 'admin' : 'employee',
+                status: isMaster ? 'active' : 'pending_approval',
               });
             }
           } else {
@@ -153,7 +145,7 @@ export function AuthProvider({ children }) {
   };
 
   // Sign up
-  const signup = async (email, password, displayName, role = 'employee') => {
+  const signup = async (email, password, displayName) => {
     setAuthError(null);
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -161,19 +153,9 @@ export function AuthProvider({ children }) {
         await updateProfile(cred.user, { displayName });
       }
 
-      const isKnownAdmin = isKnownAdminEmail(email);
-
-      let isFirstUser = false;
-      try {
-        const allUsersSnap = await getDocs(collection(db, 'users'));
-        isFirstUser = allUsersSnap.empty;
-      } catch (e) {
-        isFirstUser = true;
-      }
-
-      const shouldBeAdmin = isFirstUser || isKnownAdmin;
-      const finalRole = shouldBeAdmin ? 'admin' : role;
-      const finalStatus = 'active';
+      const isMaster = isMasterAdminEmail(email);
+      const finalRole = isMaster ? 'admin' : 'employee';
+      const finalStatus = isMaster ? 'active' : 'pending_approval';
 
       const profileData = {
         uid: cred.user.uid,
@@ -209,39 +191,6 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Activate Self as Admin
-  const activateSelfAsAdmin = async () => {
-    if (!user) return;
-    try {
-      const userDocRef = doc(db, 'users', user.uid);
-      await setDoc(userDocRef, {
-        role: 'admin',
-        status: 'active',
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      setUserProfile(prev => ({
-        ...(prev || {}),
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName || user.email?.split('@')[0] || 'Administrator',
-        role: 'admin',
-        status: 'active',
-      }));
-      return true;
-    } catch (err) {
-      console.error('Failed to activate admin in Firestore:', err);
-      setUserProfile(prev => ({
-        ...(prev || {}),
-        uid: user.uid,
-        email: user.email,
-        role: 'admin',
-        status: 'active',
-      }));
-      return true;
-    }
-  };
-
   // Password Reset
   const resetPassword = async (email) => {
     setAuthError(null);
@@ -261,7 +210,7 @@ export function AuthProvider({ children }) {
       const snap = await getDoc(userDocRef);
       if (snap.exists()) {
         const data = snap.data();
-        if (isKnownAdminEmail(user.email) && (data.status !== 'active' || data.role !== 'admin')) {
+        if (isMasterAdminEmail(user.email) && (data.status !== 'active' || data.role !== 'admin')) {
           await setDoc(userDocRef, { role: 'admin', status: 'active', updatedAt: serverTimestamp() }, { merge: true });
           const updated = { ...data, role: 'admin', status: 'active' };
           setUserProfile(updated);
@@ -269,31 +218,9 @@ export function AuthProvider({ children }) {
         }
         setUserProfile(data);
         return data;
-      } else {
-        const newProf = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email?.split('@')[0] || 'Administrator',
-          role: 'admin',
-          status: 'active',
-        };
-        await setDoc(userDocRef, newProf, { merge: true });
-        setUserProfile(newProf);
-        return newProf;
       }
     } catch (e) {
       console.warn('Error refreshing profile:', e);
-      if (isKnownAdminEmail(user.email)) {
-        const fallback = {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName || 'Administrator',
-          role: 'admin',
-          status: 'active',
-        };
-        setUserProfile(fallback);
-        return fallback;
-      }
     }
     return userProfile;
   };
@@ -320,10 +247,9 @@ export function AuthProvider({ children }) {
 
   const isAdmin =
     userProfile?.role === 'admin' ||
-    isKnownAdminEmail(user?.email) ||
-    (!userProfile?.role && isKnownAdminEmail(user?.email));
+    isMasterAdminEmail(user?.email);
   const isEmployee = userProfile?.role === 'employee' || isAdmin;
-  const isApproved = userProfile?.status === 'active' || isKnownAdminEmail(user?.email);
+  const isApproved = userProfile?.status === 'active' || isMasterAdminEmail(user?.email);
 
   return (
     <AuthContext.Provider
@@ -337,7 +263,6 @@ export function AuthProvider({ children }) {
         isApproved,
         login,
         signup,
-        activateSelfAsAdmin,
         resetPassword,
         refreshProfile,
         logout,
