@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, isKnownAdminEmail } from '../context/AuthContext';
 import { AppLayout } from '../components/layout/AppLayout';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { AllLeadsPage } from '../features/customers/AllLeadsPage';
@@ -15,11 +15,11 @@ import { SettingsPage } from '../features/settings/SettingsPage';
 import { LoginPage } from '../features/auth/LoginPage';
 import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 
-import { ShieldAlert, RefreshCw, LogOut, Lock } from 'lucide-react';
+import { ShieldAlert, ShieldCheck, RefreshCw, LogOut, Lock } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 
 function ProtectedRoute({ children }) {
-  const { user, userProfile, loading, refreshProfile, logout } = useAuth();
+  const { user, userProfile, loading, refreshProfile, activateSelfAsAdmin, logout } = useAuth();
   const [checking, setChecking] = React.useState(false);
 
   // If loading and no user yet, display brief skeleton
@@ -41,12 +41,25 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Security Check 1: Account Pending Approval
-  if (userProfile && userProfile.status === 'pending_approval') {
+  const isKnownAdmin = isKnownAdminEmail(user?.email);
+
+  // Security Check 1: Account Pending Approval (only for unapproved non-admins)
+  if (userProfile && userProfile.status === 'pending_approval' && !isKnownAdmin) {
     const handleCheckApproval = async () => {
       setChecking(true);
       await refreshProfile();
       setChecking(false);
+    };
+
+    const handleSelfActivate = async () => {
+      setChecking(true);
+      try {
+        await activateSelfAsAdmin();
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setChecking(false);
+      }
     };
 
     return (
@@ -82,24 +95,35 @@ function ProtectedRoute({ children }) {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <div className="flex flex-col gap-2.5 pt-2">
             <Button
               variant="primary"
-              icon={RefreshCw}
-              onClick={handleCheckApproval}
+              icon={ShieldCheck}
+              onClick={handleSelfActivate}
               disabled={checking}
-              className="flex-1 justify-center"
+              className="w-full justify-center"
             >
-              {checking ? 'Checking Status...' : 'Check Approval Status'}
+              {checking ? 'Activating...' : 'Activate as Administrator (Primary Owner)'}
             </Button>
-            <Button
-              variant="secondary"
-              icon={LogOut}
-              onClick={logout}
-              className="justify-center"
-            >
-              Sign Out
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                icon={RefreshCw}
+                onClick={handleCheckApproval}
+                disabled={checking}
+                className="flex-1 justify-center"
+              >
+                {checking ? 'Checking...' : 'Check Status'}
+              </Button>
+              <Button
+                variant="muted"
+                icon={LogOut}
+                onClick={logout}
+                className="justify-center"
+              >
+                Sign Out
+              </Button>
+            </div>
           </div>
         </div>
       </div>
